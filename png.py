@@ -2,6 +2,7 @@ import struct, zlib
 
 f = open("w.png", 'wb')
 
+
 # Opening bytes of PNG
 byte_arr = [137, 80, 78, 71, 13, 10, 26, 10]
 bin_format = bytearray(byte_arr)

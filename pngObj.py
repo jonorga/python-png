@@ -1,4 +1,4 @@
-import struct, zlib
+import struct, zlib, math
 
 class png_obj:
 	def __init__(self, png_file):
@@ -33,13 +33,207 @@ class png_obj:
 		self.filter_method = self.raw_data[27]
 		self.interlace = self.raw_data[28]
 
-		i = 28
-		self.chunks_in_file = []
+		# Read all other chunks
+		i = 33
+		self.chunks_in_file = ["IHDR"]
+		self.red_arr = []
+		self.green_arr = []
+		self.blue_arr = []
+		self.alpha_arr = []
 
-		chunk2_leng = self.raw_data[33:37]
-		chunk2_leng_dc = int.from_bytes(chunk2_leng, byteorder='big')
-		print(chunk2_leng_dc)
-		#while i < len(self.raw_data):
+		while i < len(self.raw_data):
+			chunk_length_raw = self.raw_data[i:i+4]
+			chunk_length_dc = int.from_bytes(chunk_length_raw, byteorder='big')
+			i += 4
+			chunk_name_raw = self.raw_data[i:i+4]
+			chunk_name_dc = chunk_name_raw.decode('ascii')
+
+			self.chunks_in_file.append(chunk_name_dc)
+
+			# IDAT Section
+			if chunk_name_dc == "IDAT":
+				compressed_idat = self.raw_data[i+4:i+4+chunk_length_dc]
+				idat_data = zlib.decompress(compressed_idat)
+				j = 0
+				column = 0
+				cur_filter = -1
+				cur_pixel = 0
+				first_line = True
+
+				if self.color_type == 6:
+					while j < len(idat_data):
+						if column == 0:
+							cur_filter = idat_data[j]
+							j += 1
+						if cur_filter == 0:
+							self.red_arr.append(idat_data[j])
+							self.green_arr.append(idat_data[j+1])
+							self.blue_arr.append(idat_data[j+2])
+							self.alpha_arr.append(idat_data[j+3])
+						elif cur_filter == 1 and len(self.red_arr) != 0:
+							if idat_data[j] + self.red_arr[cur_pixel - 1] < 256:
+								self.red_arr.append(idat_data[j] + self.red_arr[cur_pixel - 1])
+							else:
+								self.red_arr.append(idat_data[j] + self.red_arr[cur_pixel - 1] - 256)
+							if idat_data[j+1] + self.green_arr[cur_pixel - 1] < 256:
+								self.green_arr.append(idat_data[j+1] + self.green_arr[cur_pixel - 1])
+							else:
+								self.green_arr.append(idat_data[j+1] + self.green_arr[cur_pixel - 1] - 256)
+							if idat_data[j+2] + self.blue_arr[cur_pixel - 1] < 256:
+								self.blue_arr.append(idat_data[j+2] + self.blue_arr[cur_pixel - 1])
+							else:
+								self.blue_arr.append(idat_data[j+2] + self.blue_arr[cur_pixel - 1] - 256)
+							if idat_data[j+3] + self.alpha_arr[cur_pixel - 1] < 256:
+								self.alpha_arr.append(idat_data[j+3] + self.alpha_arr[cur_pixel - 1])
+							else:
+								self.alpha_arr.append(idat_data[j+3] + self.alpha_arr[cur_pixel - 1] - 256)
+						elif cur_filter == 1 and len(self.red_arr) == 0:
+							self.red_arr.append(idat_data[j])
+							self.green_arr.append(idat_data[j+1])
+							self.blue_arr.append(idat_data[j+2])
+							self.alpha_arr.append(idat_data[j+3])
+						elif cur_filter == 2 and not first_line:
+							if idat_data[j] + self.red_arr[cur_pixel - self.width_dc] < 256:
+								self.red_arr.append(idat_data[j] + self.red_arr[cur_pixel - self.width_dc])
+							else:
+								self.red_arr.append(idat_data[j] + self.red_arr[cur_pixel - self.width_dc] - 256)
+							if idat_data[j+1] + self.green_arr[cur_pixel - self.width_dc] < 256:
+								self.green_arr.append(idat_data[j+1] + self.green_arr[cur_pixel - self.width_dc])
+							else:
+								self.green_arr.append(idat_data[j+1] + self.green_arr[cur_pixel - self.width_dc] - 256)
+							if idat_data[j+2] + self.blue_arr[cur_pixel - self.width_dc] < 256:
+								self.blue_arr.append(idat_data[j+2] + self.blue_arr[cur_pixel - self.width_dc])
+							else:
+								self.blue_arr.append(idat_data[j+2] + self.blue_arr[cur_pixel - self.width_dc] - 256)
+							if idat_data[j+3] + self.alpha_arr[cur_pixel - self.width_dc] < 256:
+								self.alpha_arr.append(idat_data[j+3] + self.alpha_arr[cur_pixel - self.width_dc])
+							else:
+								self.alpha_arr.append(idat_data[j+3] + self.alpha_arr[cur_pixel - self.width_dc] - 256)
+						elif cur_filter == 2 and first_line:
+							self.red_arr.append(idat_data[j])
+							self.green_arr.append(idat_data[j+1])
+							self.blue_arr.append(idat_data[j+2])
+							self.alpha_arr.append(idat_data[j+3])
+						elif cur_filter == 3 and not first_line:
+							average = (self.red_arr[cur_pixel - 1] + self.red_arr[cur_pixel - self.width_dc])/2
+							average = math.floor(average)
+							if idat_data[j] + average < 256:
+								self.red_arr.append(idat_data[j] + average)
+							else:
+								self.red_arr.append(idat_data[j] + average - 256)
+							average = (self.green_arr[cur_pixel - 1] + self.green_arr[cur_pixel - self.width_dc])/2
+							average = math.floor(average)
+							if idat_data[j+1] + average < 256:
+								self.green_arr.append(idat_data[j+1] + average)
+							else:
+								self.green_arr.append(idat_data[j+1] + average - 256)
+							average = (self.blue_arr[cur_pixel - 1] + self.blue_arr[cur_pixel - self.width_dc])/2
+							average = math.floor(average)
+							if idat_data[j+2] + average < 256:
+								self.blue_arr.append(idat_data[j+2] + average)
+							else:
+								self.blue_arr.append(idat_data[j+2] + average - 256)
+							average = (self.alpha_arr[cur_pixel - 1] + self.alpha_arr[cur_pixel - self.width_dc])/2
+							average = math.floor(average)
+							if idat_data[j+3] + average < 256:
+								self.alpha_arr.append(idat_data[j+3] + average)
+							else:
+								self.alpha_arr.append(idat_data[j+3] + average - 256)
+						elif cur_filter == 3 and first_line:
+							self.red_arr.append(idat_data[j])
+							self.green_arr.append(idat_data[j+1])
+							self.blue_arr.append(idat_data[j+2])
+							self.alpha_arr.append(idat_data[j+3])
+						elif cur_filter == 4 and not first_line:
+							pix_a = self.red_arr[cur_pixel - 1]
+							pix_b = self.red_arr[cur_pixel - self.width_dc]
+							pix_c = self.red_arr[cur_pixel - self.width_dc - 1]
+							paeth = pix_a + pix_b - pix_c
+							paeth_a = abs(paeth - pix_a)
+							paeth_b = abs(paeth - pix_b)
+							paeth_c = abs(paeth - pix_c)
+							if paeth_a <= paeth_b and paeth_a <= paeth_c:
+								paeth_r = pix_a
+							elif paeth_b <= paeth_c:
+								paeth_r = pix_b
+							else:
+								paeth_r = pix_c
+							if idat_data[j] + paeth_r < 256:
+								self.red_arr.append(idat_data[j] + paeth_r)
+							else:
+								self.red_arr.append(idat_data[j] + paeth_r - 256)
+
+							pix_a = self.green_arr[cur_pixel - 1]
+							pix_b = self.green_arr[cur_pixel - self.width_dc]
+							pix_c = self.green_arr[cur_pixel - self.width_dc - 1]
+							paeth = pix_a + pix_b - pix_c
+							paeth_a = abs(paeth - pix_a)
+							paeth_b = abs(paeth - pix_b)
+							paeth_c = abs(paeth - pix_c)
+							if paeth_a <= paeth_b and paeth_a <= paeth_c:
+								paeth_r = pix_a
+							elif paeth_b <= paeth_c:
+								paeth_r = pix_b
+							else:
+								paeth_r = pix_c
+							if idat_data[j+1] + paeth_r < 256:
+								self.green_arr.append(idat_data[j+1] + paeth_r)
+							else:
+								self.green_arr.append(idat_data[j+1] + paeth_r - 256)
+
+							pix_a = self.blue_arr[cur_pixel - 1]
+							pix_b = self.blue_arr[cur_pixel - self.width_dc]
+							pix_c = self.blue_arr[cur_pixel - self.width_dc - 1]
+							paeth = pix_a + pix_b - pix_c
+							paeth_a = abs(paeth - pix_a)
+							paeth_b = abs(paeth - pix_b)
+							paeth_c = abs(paeth - pix_c)
+							if paeth_a <= paeth_b and paeth_a <= paeth_c:
+								paeth_r = pix_a
+							elif paeth_b <= paeth_c:
+								paeth_r = pix_b
+							else:
+								paeth_r = pix_c
+							if idat_data[j+2] + paeth_r < 256:
+								self.blue_arr.append(idat_data[j+2] + paeth_r)
+							else:
+								self.blue_arr.append(idat_data[j+2] + paeth_r - 256)
+
+							pix_a = self.alpha_arr[cur_pixel - 1]
+							pix_b = self.alpha_arr[cur_pixel - self.width_dc]
+							pix_c = self.alpha_arr[cur_pixel - self.width_dc - 1]
+							paeth = pix_a + pix_b - pix_c
+							paeth_a = abs(paeth - pix_a)
+							paeth_b = abs(paeth - pix_b)
+							paeth_c = abs(paeth - pix_c)
+							if paeth_a <= paeth_b and paeth_a <= paeth_c:
+								paeth_r = pix_a
+							elif paeth_b <= paeth_c:
+								paeth_r = pix_b
+							else:
+								paeth_r = pix_c
+							if idat_data[j+3] + paeth_r < 256:
+								self.alpha_arr.append(idat_data[j+3] + paeth_r)
+							else:
+								self.alpha_arr.append(idat_data[j+3] + paeth_r - 256)
+						elif cur_filter == 4 and first_line:
+							self.red_arr.append(idat_data[j])
+							self.green_arr.append(idat_data[j+1])
+							self.blue_arr.append(idat_data[j+2])
+							self.alpha_arr.append(idat_data[j+3])
+						j += 4
+						cur_pixel += 1
+						if column == self.width_dc - 1:
+							column = 0
+							first_line = False
+						else:
+							column += 1
+
+
+			if chunk_name_dc == "IEND":
+				i += 20
+			else:
+				i += 8 + chunk_length_dc
 
 
 
@@ -62,4 +256,19 @@ class png_obj:
 		print("Interlace:", self.interlace)
 
 
-img = png_obj("test.png")
+	def PrintChunks(self):
+		j = 0
+		while j < len(self.chunks_in_file):
+			print("Chunk " + str(j+1) + ": " + self.chunks_in_file[j])
+			j += 1
+
+	def PrintPixels(self):
+		j = 0
+		while j < len(self.red_arr):
+			print("Pixel " + str(j+1) + ": " + str(self.red_arr[j]) + " " + str(self.green_arr[j]) + " " + str(self.blue_arr[j]) + " " + str(self.alpha_arr[j]))
+			j += 1
+
+
+img = png_obj("test3.png")
+img.PrintHeaderValues()
+img.PrintPixels()
