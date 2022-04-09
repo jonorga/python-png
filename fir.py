@@ -1,15 +1,22 @@
 ### TODO
 # Go here for instructions: https://www.w3.org/TR/PNG/
 # Look at sect 5.6 "Chunk Ordering" for links to all subs
+# Add the other filter methods
+# Add zlib CRC stuff: https://www.geeksforgeeks.org/zlib-crc32-in-python/
 
-import struct
+import struct, zlib
 
 f = open("test.png", 'rb')
 raw_data = f.read()
 
+red_arr = []
+green_arr = []
+blue_arr = []
+alpha_arr = []
+
 print("\n\nRaw PNG data:")
 i = 0
-while i < 749:
+while i < 813:
 	if i < 8:
 		print("Header Byte " + str(i) + ": " + str(raw_data[i]))
 		i += 1
@@ -26,6 +33,7 @@ while i < 749:
 	elif i < 17:
 		width_leng = raw_data[i:i+4]
 		width_leng_dc = int.from_bytes(width_leng, byteorder='big')
+		width = width_leng_dc
 		print("Width: " + str(width_leng_dc))
 		i += 4
 	elif i < 21:
@@ -52,6 +60,7 @@ while i < 749:
 		crc1 = raw_data[i:i+4]
 		crc1_dc = int.from_bytes(crc1, byteorder='big')
 		print("CRC 1: " + str(crc1_dc))
+		print("CRC minus length: " + str(zlib.crc32(raw_data[12:29])))
 		i += 4
 	elif i < 34:
 		header2_leng = raw_data[i:i+4]
@@ -71,7 +80,10 @@ while i < 749:
 	elif i < 46:
 		crc2 = raw_data[i:i+4]
 		crc2_dc = int.from_bytes(crc2, byteorder='big')
-		print("CRC 2: " + str(crc2_dc))
+		if crc2_dc == zlib.crc32(raw_data[37:45]):
+			print("CRC 2: " + str(crc2_dc) + "(OK)")
+		else:
+			print("CRC 2: " + str(crc2_dc) + "(ERROR)")
 		i += 4
 	elif i < 50:
 		header3_leng = raw_data[i:i+4]
@@ -178,6 +190,162 @@ while i < 749:
 		header6_name = header6_name.decode('ascii')
 		print("Chunk 6 name: " + header6_name)
 		i += 4
+	elif i < 796:
+		compressed_idat = raw_data[i:i+48]
+		decompressed_idat = zlib.decompress(compressed_idat)
+		print("Decomped length: " + str(len(decompressed_idat)))
+		# First byte is a filter for the row
+		# Ref: https://stackoverflow.com/questions/49017937/png-decompressed-idat-chunk-how-to-read
+		# If the next few rows are filtered, you will need to unfilter them
+		# Filter methods: https://www.w3.org/TR/PNG/#9FtIntro
+		j = 0
+		col = 0
+		filter_method = -1
+		cur_pixel = 0
+		while j < 124:
+			if col == 0:
+				if decompressed_idat[j] == 0:
+					print("Filter method: None (0)")
+				elif decompressed_idat[j] == 1:
+					print("Filter method: Sub (1)")
+				elif decompressed_idat[j] == 2:
+					print("Filter method: Up (2)")
+				elif decompressed_idat[j] == 3:
+					print("Filter method: Average (3)")
+				elif decompressed_idat[j] == 4:
+					print("Filter method: Paeth (4)")
+				filter_method = decompressed_idat[j]
+				j += 1
+			if filter_method == 0:
+				red_arr.append(decompressed_idat[j])
+				green_arr.append(decompressed_idat[j+1])
+				blue_arr.append(decompressed_idat[j+2])
+				alpha_arr.append(decompressed_idat[j+3])
+				print("Recon Pixel " + str(cur_pixel) + ": " + str(red_arr[cur_pixel]) + " " + str(green_arr[cur_pixel]) + " " + str(blue_arr[cur_pixel]) + " " + str(alpha_arr[cur_pixel]))
+			elif filter_method == 2:
+				if decompressed_idat[j] + red_arr[cur_pixel - width] < 256:
+					red_arr.append(decompressed_idat[j] + red_arr[cur_pixel - width])
+				else:
+					red_arr.append(decompressed_idat[j] + red_arr[cur_pixel - width] - 256)
+				if decompressed_idat[j+1] + green_arr[cur_pixel - width] < 256:
+					green_arr.append(decompressed_idat[j+1] + green_arr[cur_pixel - width])
+				else:
+					green_arr.append(decompressed_idat[j+1] + green_arr[cur_pixel - width] - 256)
+				if decompressed_idat[j+2] + blue_arr[cur_pixel - width] < 256:
+					blue_arr.append(decompressed_idat[j+2] + blue_arr[cur_pixel - width])
+				else:
+					blue_arr.append(decompressed_idat[j+2] + blue_arr[cur_pixel - width] - 256)
+				if decompressed_idat[j+3] + alpha_arr[cur_pixel - width] < 256:
+					alpha_arr.append(decompressed_idat[j+3] + alpha_arr[cur_pixel - width])
+				else:
+					alpha_arr.append(decompressed_idat[j+3] + alpha_arr[cur_pixel - width] - 256)
+				print("Recon Pixel " + str(cur_pixel) + ": " + str(red_arr[cur_pixel]) + " " + str(green_arr[cur_pixel]) + " " + str(blue_arr[cur_pixel]) + " " + str(alpha_arr[cur_pixel]))
+			elif filter_method == 4:
+				pix_a = red_arr[cur_pixel - 1]
+				pix_b = red_arr[cur_pixel - width]
+				pix_c = red_arr[cur_pixel - width - 1]
+				paeth = pix_a + pix_b - pix_c
+				paeth_a = abs(paeth - pix_a)
+				paeth_b = abs(paeth - pix_b)
+				paeth_c = abs(paeth - pix_c)
+				if paeth_a <= paeth_b and paeth_a <= paeth_c:
+					paeth_r = pix_a
+				elif paeth_b <= paeth_c:
+					paeth_r = pix_b
+				else:
+					paeth_r = pix_c
+				if decompressed_idat[j] + paeth_r < 256:
+					red_arr.append(decompressed_idat[j] + paeth_r)
+				else:
+					red_arr.append(decompressed_idat[j] + paeth_r - 256)
+
+				pix_a = green_arr[cur_pixel - 1]
+				pix_b = green_arr[cur_pixel - width]
+				pix_c = green_arr[cur_pixel - width - 1]
+				paeth = pix_a + pix_b - pix_c
+				paeth_a = abs(paeth - pix_a)
+				paeth_b = abs(paeth - pix_b)
+				paeth_c = abs(paeth - pix_c)
+				if paeth_a <= paeth_b and paeth_a <= paeth_c:
+					paeth_r = pix_a
+				elif paeth_b <= paeth_c:
+					paeth_r = pix_b
+				else:
+					paeth_r = pix_c
+				if decompressed_idat[j+1] + paeth_r < 256:
+					green_arr.append(decompressed_idat[j+1] + paeth_r)
+				else:
+					green_arr.append(decompressed_idat[j+1] + paeth_r - 256)
+
+				pix_a = blue_arr[cur_pixel - 1]
+				pix_b = blue_arr[cur_pixel - width]
+				pix_c = blue_arr[cur_pixel - width - 1]
+				paeth = pix_a + pix_b - pix_c
+				paeth_a = abs(paeth - pix_a)
+				paeth_b = abs(paeth - pix_b)
+				paeth_c = abs(paeth - pix_c)
+				if paeth_a <= paeth_b and paeth_a <= paeth_c:
+					paeth_r = pix_a
+				elif paeth_b <= paeth_c:
+					paeth_r = pix_b
+				else:
+					paeth_r = pix_c
+				if decompressed_idat[j+2] + paeth_r < 256:
+					blue_arr.append(decompressed_idat[j+2] + paeth_r)
+				else:
+					blue_arr.append(decompressed_idat[j+2] + paeth_r - 256)
+
+				pix_a = alpha_arr[cur_pixel - 1]
+				pix_b = alpha_arr[cur_pixel - width]
+				pix_c = alpha_arr[cur_pixel - width - 1]
+				paeth = pix_a + pix_b - pix_c
+				paeth_a = abs(paeth - pix_a)
+				paeth_b = abs(paeth - pix_b)
+				paeth_c = abs(paeth - pix_c)
+				if paeth_a <= paeth_b and paeth_a <= paeth_c:
+					paeth_r = pix_a
+				elif paeth_b <= paeth_c:
+					paeth_r = pix_b
+				else:
+					paeth_r = pix_c
+				if decompressed_idat[j+3] + paeth_r < 256:
+					alpha_arr.append(decompressed_idat[j+3] + paeth_r)
+				else:
+					alpha_arr.append(decompressed_idat[j+3] + paeth_r - 256)
+
+				print("Recon Pixel " + str(cur_pixel) + ": " + str(red_arr[cur_pixel]) + " " + str(green_arr[cur_pixel]) + " " + str(blue_arr[cur_pixel]) + " " + str(alpha_arr[cur_pixel]))
+			else:
+				print("Filtered Pixel " + str(cur_pixel) + ": " + str(decompressed_idat[j]) + " " + str(decompressed_idat[j+1]) + " " + str(decompressed_idat[j+2]) + " " + str(decompressed_idat[j+3]))
+			j += 4
+			cur_pixel += 1
+			if col == 5:
+				col = 0
+			else:
+				col += 1
+		i += 48
+	elif i < 800:
+		crc5 = raw_data[i:i+4]
+		crc5_dc = int.from_bytes(crc5, byteorder='big')
+		print("CRC 5: " + str(crc5_dc))
+		i += 4
+	elif i < 804:
+		header7_leng = raw_data[i:i+4]
+		header7_leng_dc = int.from_bytes(header7_leng, byteorder='big')
+		print("Chunk 7 Length: " + str(header7_leng_dc))
+		i += 4
+	elif i < 808:
+		header7_name_b = raw_data[i:i+4]
+		header7_name_s = header7_name_b.decode('ascii')
+		print("Chunk 7 name: " + header7_name_s)
+		i += 4
+	elif i < 812:
+		crc7 = raw_data[i:i+4]
+		crc7_dc = int.from_bytes(crc7, byteorder='big')
+		if crc7_dc == zlib.crc32(header7_name_b):
+			print("CRC 7: " + str(crc7_dc) + " (OK)")
+		else:
+			print("CRC 7: " + str(crc7_dc) + " (ERROR)")
+		i += 4
 	else:
 		print("Byte " + str(i) + ": " + str(raw_data[i]))
 		i += 1
@@ -195,8 +363,8 @@ if idat_info:
 
 #i = idat_index + 4
 #while i < idat_index + 60:
-#	print("Sample " + str(i) + ": " + str(raw_data[i]) + " " + str(raw_data[i + 1]) + " " + str(raw_data[i + 2]))
-#	i += 3
+#	print("Sample " + str(i) + ": " + str(raw_data[i]) + " " + str(raw_data[i + 1]) + " " + str(raw_data[i + 2]) + " " + str(raw_data[i + 3]))
+#	i += 4
 
 print("\n\n")
 #print(raw_data)
