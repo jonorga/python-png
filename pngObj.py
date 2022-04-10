@@ -1,4 +1,5 @@
 import struct, zlib, math
+import time
 
 class png_obj:
 	def __init__(self, png_file):
@@ -61,9 +62,12 @@ class png_obj:
 				cur_filter = -1
 				cur_pixel = 0
 				first_line = True
+				progress = len(idat_data)
 
 				if self.color_type == 6:
 					while j < len(idat_data):
+						perc = format((j / progress)*100, '.2f')
+						print("Reading image... " + str(perc) + "%", end="\r")
 						if column == 0:
 							cur_filter = idat_data[j]
 							j += 1
@@ -231,6 +235,7 @@ class png_obj:
 						else:
 							column += 1
 
+				print("Reading image... Complete")
 
 			if chunk_name_dc == "IEND":
 				i += 20
@@ -410,7 +415,7 @@ class png_obj:
 		f.close()
 
 	def FlipColors(self):
-		new_file = self.file_name[:4] + "_new.png"
+		new_file = self.file_name[:-4] + "_new.png"
 		f = open(new_file, 'wb')
 		byte_arr = [137, 80, 78, 71, 13, 10, 26, 10]
 		bin_format = bytearray(byte_arr)
@@ -464,6 +469,7 @@ class png_obj:
 		i = 0
 		idat_byte_arr = []
 		column = 0
+		total_pix = len(self.red_arr)
 		while i < len(self.red_arr):
 			if column == 0:
 				idat_byte_arr.append(0)
@@ -471,11 +477,17 @@ class png_obj:
 			idat_byte_arr.append(self.red_arr[i])
 			idat_byte_arr.append(self.alpha_arr[i])
 			idat_byte_arr.append(self.green_arr[i])
+
+			perc = format((i / total_pix)*100, '.2f')
+			print("Writing image... " + str(perc) + "%", end="\r")
+
 			i += 1
 			if column == self.width_dc - 1:
 				column = 0
 			else:
 				column += 1
+
+		print("Writing image... Complete")
 
 		idat_byte_b = bytearray(idat_byte_arr)
 		idat_byte_comp = zlib.compress(idat_byte_b)
@@ -515,6 +527,5 @@ class png_obj:
 		f.close()
 
 
-img = png_obj("download.png")
+img = png_obj("download og.png")
 img.FlipColors()
-
