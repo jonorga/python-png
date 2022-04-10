@@ -3,6 +3,8 @@ import struct, zlib, math
 class png_obj:
 	def __init__(self, png_file):
 		# Read file
+
+		self.file_name = png_file
 		f = open(png_file, 'rb')
 		self.raw_data = f.read()
 
@@ -255,7 +257,6 @@ class png_obj:
 		print("Filter method:", self.filter_method)
 		print("Interlace:", self.interlace)
 
-
 	def PrintChunks(self):
 		j = 0
 		while j < len(self.chunks_in_file):
@@ -268,7 +269,252 @@ class png_obj:
 			print("Pixel " + str(j+1) + ": " + str(self.red_arr[j]) + " " + str(self.green_arr[j]) + " " + str(self.blue_arr[j]) + " " + str(self.alpha_arr[j]))
 			j += 1
 
+	def MixPixels(self):
+		new_file = self.file_name[:4] + "_new.png"
+		f = open(new_file, 'wb')
+		byte_arr = [137, 80, 78, 71, 13, 10, 26, 10]
+		bin_format = bytearray(byte_arr)
+		f.write(bin_format)
 
-img = png_obj("test3.png")
-img.PrintHeaderValues()
-img.PrintPixels()
+		# IHDR length
+		header_length_i = 13
+		header_length_b = header_length_i.to_bytes(4, 'big')
+		f.write(header_length_b)
+
+		# IHDR name
+		ihdr_name_s = "IHDR"
+		ihdr_section = ihdr_name_s.encode('ascii')
+
+		# PNG Width (4 bytes)
+		width_i = self.width_dc
+		ihdr_section += width_i.to_bytes(4, 'big')
+
+		# PNG Height (4 bytes)
+		height_i = self.height_dc
+		ihdr_section += height_i.to_bytes(4, 'big')
+
+		# Bit depth (1 byte) 8
+		bit_depth_i = 8
+		ihdr_section += bit_depth_i.to_bytes(1, 'big')
+
+		# Color type (1 byte) 6
+		color_type_i = 6
+		ihdr_section += color_type_i.to_bytes(1, 'big')
+
+		# Compression (1 byte) 0
+		compression_i = 0
+		ihdr_section += compression_i.to_bytes(1, 'big')
+
+		# Filter (1 byte) 0
+		filter_i = 0
+		ihdr_section += filter_i.to_bytes(1, 'big')
+
+		# Interlace (1 byte) 0
+		interlace_i = 0
+		ihdr_section += interlace_i.to_bytes(1, 'big')
+		f.write(ihdr_section)
+
+		# IHDR CRC (4 bytes)
+		ihdr_crc_i = zlib.crc32(ihdr_section)
+		ihdr_crc_b = ihdr_crc_i.to_bytes(4, 'big')
+		f.write(ihdr_crc_b)
+
+		# IDAT section (data length, IDAT name, data, CRC)
+		# IDAT data
+		i = 0
+		idat_byte_arr = []
+		column = 0
+		row = 1
+		while i < len(self.red_arr):
+			if column == 0:
+				idat_byte_arr.append(0)
+			if row % 2 == 1 and row != self.height_dc:
+				if column % 2 == 0 and column < self.width_dc - 1:
+					idat_byte_arr.append(self.red_arr[i + self.width_dc])
+					idat_byte_arr.append(self.green_arr[i + self.width_dc])
+					idat_byte_arr.append(self.blue_arr[i + self.width_dc])
+					idat_byte_arr.append(self.alpha_arr[i + self.width_dc])
+				elif column % 2 == 1 and column < self.width_dc - 1:
+					idat_byte_arr.append(self.red_arr[i - 1])
+					idat_byte_arr.append(self.green_arr[i - 1])
+					idat_byte_arr.append(self.blue_arr[i - 1])
+					idat_byte_arr.append(self.alpha_arr[i - 1])
+				else:
+					idat_byte_arr.append(self.red_arr[i])
+					idat_byte_arr.append(self.green_arr[i])
+					idat_byte_arr.append(self.blue_arr[i])
+					idat_byte_arr.append(self.alpha_arr[i])
+			elif row % 2 == 0 and row != self.height_dc:
+				if column % 2 == 0 and column < self.width_dc - 1:
+					idat_byte_arr.append(self.red_arr[i + 1])
+					idat_byte_arr.append(self.green_arr[i + 1])
+					idat_byte_arr.append(self.blue_arr[i + 1])
+					idat_byte_arr.append(self.alpha_arr[i + 1])
+				elif column % 2 == 1 and column < self.width_dc - 1:
+					idat_byte_arr.append(self.red_arr[i - self.width_dc])
+					idat_byte_arr.append(self.green_arr[i - self.width_dc])
+					idat_byte_arr.append(self.blue_arr[i - self.width_dc])
+					idat_byte_arr.append(self.alpha_arr[i - self.width_dc])
+				else:
+					idat_byte_arr.append(self.red_arr[i])
+					idat_byte_arr.append(self.green_arr[i])
+					idat_byte_arr.append(self.blue_arr[i])
+					idat_byte_arr.append(self.alpha_arr[i])
+			else:
+				idat_byte_arr.append(self.red_arr[i])
+				idat_byte_arr.append(self.green_arr[i])
+				idat_byte_arr.append(self.blue_arr[i])
+				idat_byte_arr.append(self.alpha_arr[i])
+			i += 1
+			if column == self.width_dc - 1:
+				column = 0
+				row += 1
+			else:
+				column += 1
+
+		idat_byte_b = bytearray(idat_byte_arr)
+		idat_byte_comp = zlib.compress(idat_byte_b)
+
+		# IDAT length
+		data_length_i = len(idat_byte_comp)
+		data_length_b = data_length_i.to_bytes(4, 'big')
+		f.write(data_length_b)
+
+		# IDAT name
+		data_name_s = "IDAT"
+		data_section = data_name_s.encode('ascii')
+		data_section += idat_byte_comp
+		f.write(data_section)
+
+		# IDAT CRC
+		idat_crc_i = zlib.crc32(data_section)
+		idat_crc_b = idat_crc_i.to_bytes(4, 'big')
+		f.write(idat_crc_b)
+
+		# IEND section (data length, IEND name, CRC)
+		# IEND length
+		iend_length_i = 0
+		iend_length_b = iend_length_i.to_bytes(4, 'big')
+		f.write(iend_length_b)
+
+		# IEND name
+		iend_name_s = "IEND"
+		iend_name_b = iend_name_s.encode('ascii')
+		f.write(iend_name_b)
+
+		# IEND CRC
+		iend_crc_i = zlib.crc32(iend_name_b)
+		iend_crc_b = iend_crc_i.to_bytes(4, 'big')
+		f.write(iend_crc_b)
+
+		f.close()
+
+	def FlipColors(self):
+		new_file = self.file_name[:4] + "_new.png"
+		f = open(new_file, 'wb')
+		byte_arr = [137, 80, 78, 71, 13, 10, 26, 10]
+		bin_format = bytearray(byte_arr)
+		f.write(bin_format)
+
+		# IHDR length
+		header_length_i = 13
+		header_length_b = header_length_i.to_bytes(4, 'big')
+		f.write(header_length_b)
+
+		# IHDR name
+		ihdr_name_s = "IHDR"
+		ihdr_section = ihdr_name_s.encode('ascii')
+
+		# PNG Width (4 bytes)
+		width_i = self.width_dc
+		ihdr_section += width_i.to_bytes(4, 'big')
+
+		# PNG Height (4 bytes)
+		height_i = self.height_dc
+		ihdr_section += height_i.to_bytes(4, 'big')
+
+		# Bit depth (1 byte) 8
+		bit_depth_i = 8
+		ihdr_section += bit_depth_i.to_bytes(1, 'big')
+
+		# Color type (1 byte) 6
+		color_type_i = 6
+		ihdr_section += color_type_i.to_bytes(1, 'big')
+
+		# Compression (1 byte) 0
+		compression_i = 0
+		ihdr_section += compression_i.to_bytes(1, 'big')
+
+		# Filter (1 byte) 0
+		filter_i = 0
+		ihdr_section += filter_i.to_bytes(1, 'big')
+
+		# Interlace (1 byte) 0
+		interlace_i = 0
+		ihdr_section += interlace_i.to_bytes(1, 'big')
+		f.write(ihdr_section)
+
+		# IHDR CRC (4 bytes)
+		ihdr_crc_i = zlib.crc32(ihdr_section)
+		ihdr_crc_b = ihdr_crc_i.to_bytes(4, 'big')
+		f.write(ihdr_crc_b)
+
+		# IDAT section (data length, IDAT name, data, CRC)
+		# IDAT data
+		i = 0
+		idat_byte_arr = []
+		column = 0
+		while i < len(self.red_arr):
+			if column == 0:
+				idat_byte_arr.append(0)
+			idat_byte_arr.append(self.blue_arr[i])
+			idat_byte_arr.append(self.red_arr[i])
+			idat_byte_arr.append(self.alpha_arr[i])
+			idat_byte_arr.append(self.green_arr[i])
+			i += 1
+			if column == self.width_dc - 1:
+				column = 0
+			else:
+				column += 1
+
+		idat_byte_b = bytearray(idat_byte_arr)
+		idat_byte_comp = zlib.compress(idat_byte_b)
+
+		# IDAT length
+		data_length_i = len(idat_byte_comp)
+		data_length_b = data_length_i.to_bytes(4, 'big')
+		f.write(data_length_b)
+
+		# IDAT name
+		data_name_s = "IDAT"
+		data_section = data_name_s.encode('ascii')
+		data_section += idat_byte_comp
+		f.write(data_section)
+
+		# IDAT CRC
+		idat_crc_i = zlib.crc32(data_section)
+		idat_crc_b = idat_crc_i.to_bytes(4, 'big')
+		f.write(idat_crc_b)
+
+		# IEND section (data length, IEND name, CRC)
+		# IEND length
+		iend_length_i = 0
+		iend_length_b = iend_length_i.to_bytes(4, 'big')
+		f.write(iend_length_b)
+
+		# IEND name
+		iend_name_s = "IEND"
+		iend_name_b = iend_name_s.encode('ascii')
+		f.write(iend_name_b)
+
+		# IEND CRC
+		iend_crc_i = zlib.crc32(iend_name_b)
+		iend_crc_b = iend_crc_i.to_bytes(4, 'big')
+		f.write(iend_crc_b)
+
+		f.close()
+
+
+img = png_obj("download.png")
+img.FlipColors()
+
