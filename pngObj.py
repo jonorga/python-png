@@ -1,5 +1,7 @@
 import struct, zlib, math
 
+print("testin stuff")
+
 class png_obj:
 	def __init__(self, png_file):
 		# Read file
@@ -665,5 +667,5 @@ class png_obj:
 		f.close()
 
 
-img = png_obj("download og.png")
-img.ColorScramble()
+#img = png_obj("download og.png")
+#img.ColorScramble()
