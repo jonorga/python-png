@@ -1,7 +1,5 @@
 import struct, zlib, math
 
-print("testin stuff")
-
 class png_obj:
 	def __init__(self, png_file):
 		# Read file
