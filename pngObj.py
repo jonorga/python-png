@@ -76,8 +76,7 @@ class png_obj:
 					# Indexed-colour (3)
 					# Greyscale with alpha (4)
 
-
-				if self.color_type == 6:
+				if self.color_type == 6 and self.bit_depth == 8:
 					while j < len(idat_data):
 						perc = format((j / progress)*100, '.2f')
 						print("Reading image... " + str(perc) + "%", end="\r")
@@ -241,6 +240,178 @@ class png_obj:
 							self.blue_arr.append(idat_data[j+2])
 							self.alpha_arr.append(idat_data[j+3])
 						j += 4
+						cur_pixel += 1
+						if column == self.width_dc - 1:
+							column = 0
+							first_line = False
+						else:
+							column += 1
+
+				if self.color_type == 6 and self.bit_depth == 16:
+					full_sample = 65536
+					while j < len(idat_data):
+						perc = format((j / progress)*100, '.2f')
+						print("Reading image... " + str(perc) + "%", end="\r")
+						if column == 0:
+							cur_filter = idat_data[j]
+							j += 1
+						if cur_filter == 0:
+							self.red_arr.append(int.from_bytes(idat_data[j:j+2], "big"))
+							self.green_arr.append(int.from_bytes(idat_data[j+2:j+4], "big"))
+							self.blue_arr.append(int.from_bytes(idat_data[j+4:j+6], "big"))
+							self.alpha_arr.append(int.from_bytes(idat_data[j+6:j+8], "big"))
+						elif cur_filter == 1 and len(self.red_arr) != 0:
+							if int.from_bytes(idat_data[j:j+2], "big") + self.red_arr[cur_pixel - 1] < full_sample:
+								self.red_arr.append(int.from_bytes(idat_data[j:j+2], "big") + self.red_arr[cur_pixel - 1])
+							else:
+								self.red_arr.append(int.from_bytes(idat_data[j:j+2], "big") + self.red_arr[cur_pixel - 1] - full_sample)
+							if int.from_bytes(idat_data[j+2:j+4], "big") + self.green_arr[cur_pixel - 1] < full_sample:
+								self.green_arr.append(int.from_bytes(idat_data[j+2:j+4], "big") + self.green_arr[cur_pixel - 1])
+							else:
+								self.green_arr.append(int.from_bytes(idat_data[j+2:j+4], "big") + self.green_arr[cur_pixel - 1] - full_sample)
+							if int.from_bytes(idat_data[j+4:j+6], "big") + self.blue_arr[cur_pixel - 1] < full_sample:
+								self.blue_arr.append(int.from_bytes(idat_data[j+4:j+6], "big") + self.blue_arr[cur_pixel - 1])
+							else:
+								self.blue_arr.append(int.from_bytes(idat_data[j+4:j+6], "big") + self.blue_arr[cur_pixel - 1] - full_sample)
+							if int.from_bytes(idat_data[j+6:j+8], "big") + self.alpha_arr[cur_pixel - 1] < full_sample:
+								self.alpha_arr.append(int.from_bytes(idat_data[j+6:j+8], "big") + self.alpha_arr[cur_pixel - 1])
+							else:
+								self.alpha_arr.append(int.from_bytes(idat_data[j+6:j+8], "big") + self.alpha_arr[cur_pixel - 1] - full_sample)
+						elif cur_filter == 1 and len(self.red_arr) == 0:
+							self.red_arr.append(int.from_bytes(idat_data[j:j+2], "big"))
+							self.green_arr.append(int.from_bytes(idat_data[j+2:j+4], "big"))
+							self.blue_arr.append(int.from_bytes(idat_data[j+4:j+6], "big"))
+							self.alpha_arr.append(int.from_bytes(idat_data[j+6:j+8], "big"))
+						elif cur_filter == 2 and not first_line:
+							if int.from_bytes(idat_data[j:j+2], "big") + self.red_arr[cur_pixel - self.width_dc] < full_sample:
+								self.red_arr.append(int.from_bytes(idat_data[j:j+2], "big") + self.red_arr[cur_pixel - self.width_dc])
+							else:
+								self.red_arr.append(int.from_bytes(idat_data[j:j+2], "big") + self.red_arr[cur_pixel - self.width_dc] - full_sample)
+							if int.from_bytes(idat_data[j+2:j+4], "big") + self.green_arr[cur_pixel - self.width_dc] < full_sample:
+								self.green_arr.append(int.from_bytes(idat_data[j+2:j+4], "big") + self.green_arr[cur_pixel - self.width_dc])
+							else:
+								self.green_arr.append(int.from_bytes(idat_data[j+2:j+4], "big") + self.green_arr[cur_pixel - self.width_dc] - full_sample)
+							if int.from_bytes(idat_data[j+4:j+6], "big") + self.blue_arr[cur_pixel - self.width_dc] < full_sample:
+								self.blue_arr.append(int.from_bytes(idat_data[j+4:j+6], "big") + self.blue_arr[cur_pixel - self.width_dc])
+							else:
+								self.blue_arr.append(int.from_bytes(idat_data[j+4:j+6], "big") + self.blue_arr[cur_pixel - self.width_dc] - full_sample)
+							if int.from_bytes(idat_data[j+6:j+8], "big") + self.alpha_arr[cur_pixel - self.width_dc] < full_sample:
+								self.alpha_arr.append(int.from_bytes(idat_data[j+6:j+8], "big") + self.alpha_arr[cur_pixel - self.width_dc])
+							else:
+								self.alpha_arr.append(int.from_bytes(idat_data[j+6:j+8], "big") + self.alpha_arr[cur_pixel - self.width_dc] - full_sample)
+						elif cur_filter == 2 and first_line:
+							self.red_arr.append(int.from_bytes(idat_data[j:j+2], "big"))
+							self.green_arr.append(int.from_bytes(idat_data[j+2:j+4], "big"))
+							self.blue_arr.append(int.from_bytes(idat_data[j+4:j+6], "big"))
+							self.alpha_arr.append(int.from_bytes(idat_data[j+6:j+8], "big"))
+						elif cur_filter == 3 and not first_line:
+							average = (self.red_arr[cur_pixel - 1] + self.red_arr[cur_pixel - self.width_dc])/2
+							average = math.floor(average)
+							if int.from_bytes(idat_data[j:j+2], "big") + average < full_sample:
+								self.red_arr.append(int.from_bytes(idat_data[j:j+2], "big") + average)
+							else:
+								self.red_arr.append(int.from_bytes(idat_data[j:j+2], "big") + average - full_sample)
+							average = (self.green_arr[cur_pixel - 1] + self.green_arr[cur_pixel - self.width_dc])/2
+							average = math.floor(average)
+							if int.from_bytes(idat_data[j+2:j+4], "big") + average < full_sample:
+								self.green_arr.append(int.from_bytes(idat_data[j+2:j+4], "big") + average)
+							else:
+								self.green_arr.append(int.from_bytes(idat_data[j+2:j+4], "big") + average - full_sample)
+							average = (self.blue_arr[cur_pixel - 1] + self.blue_arr[cur_pixel - self.width_dc])/2
+							average = math.floor(average)
+							if int.from_bytes(idat_data[j+4:j+6], "big") + average < full_sample:
+								self.blue_arr.append(int.from_bytes(idat_data[j+4:j+6], "big") + average)
+							else:
+								self.blue_arr.append(int.from_bytes(idat_data[j+4:j+6], "big") + average - full_sample)
+							average = (self.alpha_arr[cur_pixel - 1] + self.alpha_arr[cur_pixel - self.width_dc])/2
+							average = math.floor(average)
+							if int.from_bytes(idat_data[j+6:j+8], "big") + average < full_sample:
+								self.alpha_arr.append(int.from_bytes(idat_data[j+6:j+8], "big") + average)
+							else:
+								self.alpha_arr.append(int.from_bytes(idat_data[j+6:j+8], "big") + average - full_sample)
+						elif cur_filter == 3 and first_line:
+							self.red_arr.append(int.from_bytes(idat_data[j:j+2], "big"))
+							self.green_arr.append(int.from_bytes(idat_data[j+2:j+4], "big"))
+							self.blue_arr.append(int.from_bytes(idat_data[j+4:j+6], "big"))
+							self.alpha_arr.append(int.from_bytes(idat_data[j+6:j+8], "big"))
+						elif cur_filter == 4 and not first_line:
+							pix_a = self.red_arr[cur_pixel - 1]
+							pix_b = self.red_arr[cur_pixel - self.width_dc]
+							pix_c = self.red_arr[cur_pixel - self.width_dc - 1]
+							paeth = pix_a + pix_b - pix_c
+							paeth_a = abs(paeth - pix_a)
+							paeth_b = abs(paeth - pix_b)
+							paeth_c = abs(paeth - pix_c)
+							if paeth_a <= paeth_b and paeth_a <= paeth_c:
+								paeth_r = pix_a
+							elif paeth_b <= paeth_c:
+								paeth_r = pix_b
+							else:
+								paeth_r = pix_c
+							if int.from_bytes(idat_data[j:j+2], "big") + paeth_r < full_sample:
+								self.red_arr.append(int.from_bytes(idat_data[j:j+2], "big") + paeth_r)
+							else:
+								self.red_arr.append(int.from_bytes(idat_data[j:j+2], "big") + paeth_r - full_sample)
+
+							pix_a = self.green_arr[cur_pixel - 1]
+							pix_b = self.green_arr[cur_pixel - self.width_dc]
+							pix_c = self.green_arr[cur_pixel - self.width_dc - 1]
+							paeth = pix_a + pix_b - pix_c
+							paeth_a = abs(paeth - pix_a)
+							paeth_b = abs(paeth - pix_b)
+							paeth_c = abs(paeth - pix_c)
+							if paeth_a <= paeth_b and paeth_a <= paeth_c:
+								paeth_r = pix_a
+							elif paeth_b <= paeth_c:
+								paeth_r = pix_b
+							else:
+								paeth_r = pix_c
+							if int.from_bytes(idat_data[j+2:j+4], "big") + paeth_r < full_sample:
+								self.green_arr.append(int.from_bytes(idat_data[j+2:j+4], "big") + paeth_r)
+							else:
+								self.green_arr.append(int.from_bytes(idat_data[j+2:j+4], "big") + paeth_r - full_sample)
+
+							pix_a = self.blue_arr[cur_pixel - 1]
+							pix_b = self.blue_arr[cur_pixel - self.width_dc]
+							pix_c = self.blue_arr[cur_pixel - self.width_dc - 1]
+							paeth = pix_a + pix_b - pix_c
+							paeth_a = abs(paeth - pix_a)
+							paeth_b = abs(paeth - pix_b)
+							paeth_c = abs(paeth - pix_c)
+							if paeth_a <= paeth_b and paeth_a <= paeth_c:
+								paeth_r = pix_a
+							elif paeth_b <= paeth_c:
+								paeth_r = pix_b
+							else:
+								paeth_r = pix_c
+							if int.from_bytes(idat_data[j+4:j+6], "big") + paeth_r < full_sample:
+								self.blue_arr.append(int.from_bytes(idat_data[j+4:j+6], "big") + paeth_r)
+							else:
+								self.blue_arr.append(int.from_bytes(idat_data[j+4:j+6], "big") + paeth_r - full_sample)
+
+							pix_a = self.alpha_arr[cur_pixel - 1]
+							pix_b = self.alpha_arr[cur_pixel - self.width_dc]
+							pix_c = self.alpha_arr[cur_pixel - self.width_dc - 1]
+							paeth = pix_a + pix_b - pix_c
+							paeth_a = abs(paeth - pix_a)
+							paeth_b = abs(paeth - pix_b)
+							paeth_c = abs(paeth - pix_c)
+							if paeth_a <= paeth_b and paeth_a <= paeth_c:
+								paeth_r = pix_a
+							elif paeth_b <= paeth_c:
+								paeth_r = pix_b
+							else:
+								paeth_r = pix_c
+							if int.from_bytes(idat_data[j+6:j+8], "big") + paeth_r < full_sample:
+								self.alpha_arr.append(int.from_bytes(idat_data[j+6:j+8], "big") + paeth_r)
+							else:
+								self.alpha_arr.append(int.from_bytes(idat_data[j+6:j+8], "big") + paeth_r - full_sample)
+						elif cur_filter == 4 and first_line:
+							self.red_arr.append(int.from_bytes(idat_data[j:j+2], "big"))
+							self.green_arr.append(int.from_bytes(idat_data[j+2:j+4], "big"))
+							self.blue_arr.append(int.from_bytes(idat_data[j+4:j+6], "big"))
+							self.alpha_arr.append(int.from_bytes(idat_data[j+6:j+8], "big"))
+						j += 8
 						cur_pixel += 1
 						if column == self.width_dc - 1:
 							column = 0
