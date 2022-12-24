@@ -1,5 +1,5 @@
 Bit depth accounting:
-- Bitdepth can be anything from 1 - 16 bits, just account for 16 bits for the moment
+- DONE Bitdepth can be anything from 1 - 16 bits, just account for 16 bits for the moment
 - Later update account for bits 1 - 7 and 9 - 15 bits
 
 

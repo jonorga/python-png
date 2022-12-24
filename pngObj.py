@@ -623,7 +623,7 @@ class png_obj:
 		ihdr_section += height_i.to_bytes(4, 'big')
 
 		# Bit depth (1 byte) 8
-		bit_depth_i = 8
+		bit_depth_i = self.bit_depth
 		ihdr_section += bit_depth_i.to_bytes(1, 'big')
 
 		# Color type (1 byte) 6
@@ -657,18 +657,24 @@ class png_obj:
 		while i < len(self.red_arr):
 			if column == 0:
 				idat_byte_arr.append(0)
-			temp = self.red_arr[i].to_bytes(2, 'little')
-			idat_byte_arr.append(temp[0])
-			idat_byte_arr.append(temp[1])
-			temp = self.green_arr[i].to_bytes(2, 'little')
-			idat_byte_arr.append(temp[0])
-			idat_byte_arr.append(temp[1])
-			temp = self.blue_arr[i].to_bytes(2, 'little')
-			idat_byte_arr.append(temp[0])
-			idat_byte_arr.append(temp[1])
-			temp = self.alpha_arr[i].to_bytes(2, 'little')
-			idat_byte_arr.append(temp[0])
-			idat_byte_arr.append(temp[1])
+			if self.bit_depth == 16:
+				temp = self.red_arr[i].to_bytes(2, 'big')
+				idat_byte_arr.append(temp[1])
+				idat_byte_arr.append(temp[0])
+				temp = self.green_arr[i].to_bytes(2, 'big')
+				idat_byte_arr.append(temp[1])
+				idat_byte_arr.append(temp[0])
+				temp = self.blue_arr[i].to_bytes(2, 'big')
+				idat_byte_arr.append(temp[1])
+				idat_byte_arr.append(temp[0])
+				temp = self.alpha_arr[i].to_bytes(2, 'big')
+				idat_byte_arr.append(temp[1])
+				idat_byte_arr.append(temp[0])
+			elif self.bit_depth == 8:
+				idat_byte_arr.append(self.red_arr[i])
+				idat_byte_arr.append(self.green_arr[i])
+				idat_byte_arr.append(self.blue_arr[i])
+				idat_byte_arr.append(self.alpha_arr[i])
 
 			perc = format((i / total_pix)*100, '.2f')
 			print("Writing image... " + str(perc) + "%", end="\r")
