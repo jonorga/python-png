@@ -657,10 +657,18 @@ class png_obj:
 		while i < len(self.red_arr):
 			if column == 0:
 				idat_byte_arr.append(0)
-			idat_byte_arr.append(self.red_arr[i])
-			idat_byte_arr.append(self.green_arr[i])
-			idat_byte_arr.append(self.blue_arr[i])
-			idat_byte_arr.append(self.alpha_arr[i])
+			temp = self.red_arr[i].to_bytes(2, 'little')
+			idat_byte_arr.append(temp[0])
+			idat_byte_arr.append(temp[1])
+			temp = self.green_arr[i].to_bytes(2, 'little')
+			idat_byte_arr.append(temp[0])
+			idat_byte_arr.append(temp[1])
+			temp = self.blue_arr[i].to_bytes(2, 'little')
+			idat_byte_arr.append(temp[0])
+			idat_byte_arr.append(temp[1])
+			temp = self.alpha_arr[i].to_bytes(2, 'little')
+			idat_byte_arr.append(temp[0])
+			idat_byte_arr.append(temp[1])
 
 			perc = format((i / total_pix)*100, '.2f')
 			print("Writing image... " + str(perc) + "%", end="\r")
